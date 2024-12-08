@@ -3,10 +3,11 @@
 from os import name
 from typing import Iterable, NamedTuple, Sequence, TypedDict, Collection
 from argparse import ArgumentParser
+from urllib.request import urlopen, Request
 
 import re
 import csv
-import requests
+import json
 
 
 class CardInfo(NamedTuple):
@@ -78,12 +79,20 @@ def read_mox_info(in_file: str) -> Sequence[CardInfo]:
 def fetch_scryfall_data(mox_info: Iterable[CardInfo]) -> ScryfallResult:
     SCRYFALL_URL = 'https://api.scryfall.com/cards/collection'
 
+    headers = {
+        'Content-Type': 'application/json'
+    }
+
     card_ids_payload = {
         'identifiers': [get_identifier(mi) for mi in mox_info]
     }
 
-    with requests.post(SCRYFALL_URL, json=card_ids_payload) as response:
-        return response.json()
+    data = json.dumps(card_ids_payload).encode('utf-8')
+    request = Request(SCRYFALL_URL, data, headers)
+
+    with urlopen(request) as response:
+        body = response.read()
+        return json.loads(body)
 
 
 def get_export_info(mox_info: Sequence[CardInfo]) -> Collection[ExportCardInfo]:
