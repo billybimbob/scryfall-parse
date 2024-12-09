@@ -100,6 +100,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     moxfield_cards = read_moxfield_cards(args.mox_file)
-    export_info = get_card_exports(moxfield_cards)
+    card_exports = get_card_exports(moxfield_cards)
 
-    write_cards(export_info, args.output_file)
+    write_cards(card_exports, args.output_file)

@@ -31,15 +31,15 @@ def to_export(card: CardInfo) -> CardExport:
 
 
 def parse_card_exports(in_file: str) -> Sequence[CardExport]:
-    cards = list[CardExport]()
+    card_exports = list[CardExport]()
 
     with open(in_file, "r") as f:
         info: DeckInfo = json.load(f)
         deck_data = info["data"]
-        cards.extend(to_export(c) for c in deck_data["commander"])
-        cards.extend(to_export(c) for c in deck_data["mainBoard"])
+        card_exports.extend(to_export(c) for c in deck_data["commander"])
+        card_exports.extend(to_export(c) for c in deck_data["mainBoard"])
 
-    return cards
+    return card_exports
 
 
 if __name__ == "__main__":
