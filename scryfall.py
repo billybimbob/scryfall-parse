@@ -1,5 +1,5 @@
 from typing import TypedDict, NamedTuple
-from collections.abc import Iterable
+from collections.abc import Sequence
 from urllib.request import urlopen, Request
 import json
 
@@ -21,11 +21,10 @@ class ScryfallResult(TypedDict):
 
 
 class CardInfo(NamedTuple):
-    multiverse_id: str
-    set_code: str
     name: str
+    set_code: str
     collector_number: str | None
-    quantity: int
+    multiverse_id: str | None
 
 
 def get_identifier(info: CardInfo) -> dict[str, str]:
@@ -41,16 +40,26 @@ def get_identifier(info: CardInfo) -> dict[str, str]:
     return {"name": info.name, "set": info.set_code}
 
 
-def fetch_scryfall_data(mox_info: Iterable[CardInfo]) -> ScryfallResult:
+def fetch_scryfall_data(card_info: Sequence[CardInfo]) -> Sequence[ScryfallCard]:
     SCRYFALL_URL = "https://api.scryfall.com/cards/collection"
+    CHUNK_SIZE = 75
+
+    cards = list[ScryfallCard]()
 
     headers = {"Content-Type": "application/json"}
+    chunks = (
+        card_info[i : i + CHUNK_SIZE] for i in range(0, len(card_info), CHUNK_SIZE)
+    )
 
-    card_ids_payload = {"identifiers": [get_identifier(mi) for mi in mox_info]}
+    for chunk in chunks:
+        card_ids_payload = {"identifiers": [get_identifier(ci) for ci in chunk]}
+        data = json.dumps(card_ids_payload).encode("utf-8")
 
-    data = json.dumps(card_ids_payload).encode("utf-8")
-    request = Request(SCRYFALL_URL, data, headers)
+        request = Request(SCRYFALL_URL, data, headers)
 
-    with urlopen(request) as response:
-        body = response.read()
-        return json.loads(body)
+        with urlopen(request) as response:
+            body = response.read()
+            result: ScryfallResult = json.loads(body)
+            cards.extend(result["data"])
+
+    return cards
