@@ -22,7 +22,7 @@ class ScryfallResult(TypedDict):
 
 
 class CardIdentifier(Protocol):
-    def to_json_obj(self) -> dict[str, str | int]: ...
+    def to_dict(self) -> dict[str, str | int]: ...
 
 
 @dataclass
@@ -30,7 +30,7 @@ class NameSet(CardIdentifier):
     name: str
     set_code: str
 
-    def to_json_obj(self) -> dict[str, str | int]:
+    def to_dict(self) -> dict[str, str | int]:
         return {"name": self.name, "set": self.set_code}
 
 
@@ -39,7 +39,7 @@ class SetCollectorNumber(CardIdentifier):
     set_code: str
     collector_number: str
 
-    def to_json_obj(self) -> dict[str, str | int]:
+    def to_dict(self) -> dict[str, str | int]:
         return {
             "collector_number": self.collector_number,
             "set": self.set_code,
@@ -50,7 +50,7 @@ class SetCollectorNumber(CardIdentifier):
 class MultiverseId(CardIdentifier):
     multiverse_id: int
 
-    def to_json_obj(self) -> dict[str, str | int]:
+    def to_dict(self) -> dict[str, str | int]:
         return {"multiverse_id": self.multiverse_id}
 
 
@@ -66,7 +66,7 @@ def fetch_scryfall(card_info: Sequence[CardIdentifier]) -> Sequence[ScryfallCard
     )
 
     for chunk in chunks:
-        card_ids_payload = {"identifiers": [ci.to_json_obj() for ci in chunk]}
+        card_ids_payload = {"identifiers": [ci.to_dict() for ci in chunk]}
         data = json.dumps(card_ids_payload).encode("utf-8")
 
         request = Request(SCRYFALL_URL, data, headers)

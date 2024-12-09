@@ -6,7 +6,7 @@ from argparse import ArgumentParser
 import re
 
 from mtgcsv import CardExport, write_cards
-from scryfall import SetCollectorNumber, NameSet, fetch_scryfall
+from scryfall import CardIdentifier, SetCollectorNumber, NameSet, fetch_scryfall
 
 
 class MoxfieldCard(NamedTuple):
@@ -14,6 +14,13 @@ class MoxfieldCard(NamedTuple):
     name: str
     collector_number: str | None
     quantity: int
+
+
+def to_identifier(card: MoxfieldCard) -> CardIdentifier:
+    if card.collector_number is None:
+        return NameSet(card.name, card.set_code)
+    else:
+        return SetCollectorNumber(card.set_code, card.collector_number)
 
 
 def read_moxfield_cards(in_file: str) -> Sequence[MoxfieldCard]:
@@ -51,23 +58,16 @@ def read_moxfield_cards(in_file: str) -> Sequence[MoxfieldCard]:
     return moxfield_cards
 
 
-def get_card_exports(mox_info: Sequence[MoxfieldCard]) -> Sequence[CardExport]:
+def get_card_exports(moxfield_cards: Sequence[MoxfieldCard]) -> Sequence[CardExport]:
     card_exports = list[CardExport]()
 
-    quantity_map = {
-        (mi.set_code, mi.name, mi.collector_number): mi.quantity for mi in mox_info
-    }
-
-    card_identifiers = [
-        (
-            SetCollectorNumber(info.set_code, info.collector_number)
-            if info.collector_number is not None
-            else NameSet(info.name, info.set_code)
-        )
-        for info in mox_info
-    ]
-
+    card_identifiers = [to_identifier(card) for card in moxfield_cards]
     fetched_cards = fetch_scryfall(card_identifiers)
+
+    quantity_map = {
+        (mi.set_code, mi.name, mi.collector_number): mi.quantity
+        for mi in moxfield_cards
+    }
 
     for card in fetched_cards:
         card_name = card["name"]

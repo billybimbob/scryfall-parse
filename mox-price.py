@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
+from argparse import ArgumentParser
 from typing import NamedTuple
 from collections.abc import Sequence
-from argparse import ArgumentParser
 import csv
 
 from scryfall import MultiverseId, fetch_scryfall
@@ -32,11 +32,11 @@ def read_mtg_cards(in_file: str) -> Sequence[MtgCard]:
 
 
 def get_price_exports(
-    input_data: Sequence[MtgCard], price_threshold: float
+    mtg_cards: Sequence[MtgCard], price_threshold: float
 ) -> Sequence[PriceExport]:
     prices = list[PriceExport]()
 
-    multiverse_ids = [MultiverseId(data.multiverse_id) for data in input_data]
+    multiverse_ids = [MultiverseId(card.multiverse_id) for card in mtg_cards]
     fetched_cards = fetch_scryfall(multiverse_ids)
 
     price_map = {
@@ -44,7 +44,7 @@ def get_price_exports(
         for card in fetched_cards
     }
 
-    for input_value in input_data:
+    for input_value in mtg_cards:
         price = price_map.get(input_value.multiverse_id, 0)
 
         if price <= price_threshold:
