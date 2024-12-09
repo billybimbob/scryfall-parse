@@ -96,7 +96,6 @@ if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("mox_file")
     parser.add_argument("-o", "--output", dest="output_file", default="output.csv")
-
     args = parser.parse_args()
 
     moxfield_cards = read_moxfield_cards(args.mox_file)
