@@ -2,7 +2,7 @@
 
 from argparse import ArgumentParser
 from typing import TypedDict, Sequence
-from mtgcsv import ExportCardInfo, write_card_info
+from mtgcsv import CardExport, write_cards
 
 import json
 
@@ -26,14 +26,12 @@ class DeckInfo(TypedDict):
     data: CommanderDeckData
 
 
-def to_export(card: CardInfo) -> ExportCardInfo:
-    return ExportCardInfo(
-        card["name"], card["identifiers"]["multiverseId"], card["count"]
-    )
+def to_export(card: CardInfo) -> CardExport:
+    return CardExport(card["name"], card["identifiers"]["multiverseId"], card["count"])
 
 
-def parse_export_info(in_file: str) -> Sequence[ExportCardInfo]:
-    cards = list[ExportCardInfo]()
+def parse_card_exports(in_file: str) -> Sequence[CardExport]:
+    cards = list[CardExport]()
 
     with open(in_file, "r") as f:
         info: DeckInfo = json.load(f)
@@ -50,5 +48,5 @@ if __name__ == "__main__":
     parser.add_argument("--output", dest="output_file", default="output.csv")
     args = parser.parse_args()
 
-    cards = parse_export_info(args.deck_json)
-    write_card_info(cards, args.output_file)
+    cards = parse_card_exports(args.deck_json)
+    write_cards(cards, args.output_file)

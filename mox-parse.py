@@ -1,46 +1,23 @@
 #!/usr/bin/env python3
 
-from typing import NamedTuple, TypedDict
-from collections.abc import Iterable, Sequence
+from typing import NamedTuple
+from collections.abc import Sequence
 from argparse import ArgumentParser
-from urllib.request import urlopen, Request
-from mtgcsv import ExportCardInfo, write_card_info
-
 import re
-import json
+
+from mtgcsv import CardExport, write_cards
+from scryfall import SetCollectorNumber, NameSet, fetch_scryfall
 
 
-class MoxCardInfo(NamedTuple):
+class MoxfieldCard(NamedTuple):
     set_code: str
     name: str
     collector_number: str | None
     quantity: int
 
 
-class ScryfallCard(TypedDict):
-    name: str
-    multiverse_ids: list[str]  # should just be size one
-    collector_number: str
-    set: str
-
-
-class ScryfallResult(TypedDict):
-    data: list[ScryfallCard]
-
-
-def get_identifier(info: MoxCardInfo) -> dict[str, str]:
-    return (
-        {"name": info.name, "set": info.set_code}
-        if info.collector_number is None
-        else {
-            "collector_number": info.collector_number,
-            "set": info.set_code,
-        }
-    )
-
-
-def read_mox_info(in_file: str) -> Sequence[MoxCardInfo]:
-    mox_info = list[MoxCardInfo]()
+def read_moxfield_cards(in_file: str) -> Sequence[MoxfieldCard]:
+    moxfield_cards = list[MoxfieldCard]()
 
     with open(in_file, "r") as f:
         for line in f:
@@ -56,7 +33,9 @@ def read_mox_info(in_file: str) -> Sequence[MoxCardInfo]:
                 collector_number = match.group("collector")
                 quantity = int(match.group("quantity"))
 
-                mox_info.append(MoxCardInfo(set_code, name, collector_number, quantity))
+                moxfield_cards.append(
+                    MoxfieldCard(set_code, name, collector_number, quantity)
+                )
 
                 continue
 
@@ -67,59 +46,50 @@ def read_mox_info(in_file: str) -> Sequence[MoxCardInfo]:
                 name = match.group("name")
                 quantity = int(match.group("quantity"))
 
-                mox_info.append(MoxCardInfo(set_code, name, None, quantity))
+                moxfield_cards.append(MoxfieldCard(set_code, name, None, quantity))
 
-    return mox_info
-
-
-def fetch_scryfall_data(mox_info: Iterable[MoxCardInfo]) -> ScryfallResult:
-    SCRYFALL_URL = "https://api.scryfall.com/cards/collection"
-
-    headers = {"Content-Type": "application/json"}
-
-    card_ids_payload = {"identifiers": [get_identifier(mi) for mi in mox_info]}
-
-    data = json.dumps(card_ids_payload).encode("utf-8")
-    request = Request(SCRYFALL_URL, data, headers)
-
-    with urlopen(request) as response:
-        body = response.read()
-        return json.loads(body)
+    return moxfield_cards
 
 
-def get_export_info(mox_info: Sequence[MoxCardInfo]) -> Sequence[ExportCardInfo]:
-    CHUNK_SIZE = 75
-
-    export_info = list[ExportCardInfo]()
-
-    chunks = (mox_info[i : i + CHUNK_SIZE] for i in range(0, len(mox_info), CHUNK_SIZE))
+def get_card_exports(mox_info: Sequence[MoxfieldCard]) -> Sequence[CardExport]:
+    card_exports = list[CardExport]()
 
     quantity_map = {
         (mi.set_code, mi.name, mi.collector_number): mi.quantity for mi in mox_info
     }
 
-    for chunk in chunks:
-        result = fetch_scryfall_data(chunk)
+    card_identifiers = [
+        (
+            SetCollectorNumber(info.set_code, info.collector_number)
+            if info.collector_number is not None
+            else NameSet(info.name, info.set_code)
+        )
+        for info in mox_info
+    ]
 
-        for card in result["data"]:
-            card_name = card["name"]
-            multiverse_ids = card["multiverse_ids"]
+    fetched_cards = fetch_scryfall(card_identifiers)
 
-            if not multiverse_ids:
-                print("cannot parse", card_name, "missing multiverse id")
-                continue
+    for card in fetched_cards:
+        card_name = card["name"]
+        multiverse_ids = card["multiverse_ids"]
 
-            multiverse_id = multiverse_ids[0]
-            set_code = card["set"].upper()
-            collector_number = card["collector_number"]
+        if not multiverse_ids:
+            print("cannot parse", card_name, "missing multiverse id")
+            continue
 
-            quantity = quantity_map.get(
-                (set_code, card_name, None)
-            ) or quantity_map.get((set_code, card_name, collector_number), 0)
+        multiverse_id = multiverse_ids[0]
+        set_code = card["set"].upper()
+        collector_number = card["collector_number"]
 
-            export_info.append(ExportCardInfo(card_name, multiverse_id, quantity))
+        quantity = (
+            quantity_map.get((set_code, card_name, collector_number))
+            or quantity_map.get((set_code, card_name, None))
+            or 0
+        )
 
-    return export_info
+        card_exports.append(CardExport(card_name, multiverse_id, quantity))
+
+    return card_exports
 
 
 if __name__ == "__main__":
@@ -129,7 +99,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    mox_info = read_mox_info(args.mox_file)
-    export_info = get_export_info(mox_info)
+    moxfield_cards = read_moxfield_cards(args.mox_file)
+    export_info = get_card_exports(moxfield_cards)
 
-    write_card_info(export_info, args.output_file)
+    write_cards(export_info, args.output_file)

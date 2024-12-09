@@ -1,4 +1,5 @@
-from typing import TypedDict, NamedTuple
+from dataclasses import dataclass
+from typing import TypedDict, Protocol
 from collections.abc import Sequence
 from urllib.request import urlopen, Request
 import json
@@ -20,27 +21,40 @@ class ScryfallResult(TypedDict):
     data: list[ScryfallCard]
 
 
-class CardInfo(NamedTuple):
+class CardIdentifier(Protocol):
+    def to_json_obj(self) -> dict[str, str | int]: ...
+
+
+@dataclass
+class NameSet(CardIdentifier):
     name: str
     set_code: str
-    collector_number: str | None
-    multiverse_id: str | None
+
+    def to_json_obj(self) -> dict[str, str | int]:
+        return {"name": self.name, "set": self.set_code}
 
 
-def get_identifier(info: CardInfo) -> dict[str, str]:
-    if info.multiverse_id is not None:
-        return {"multiverse_id": info.multiverse_id}
+@dataclass
+class SetCollectorNumber(CardIdentifier):
+    set_code: str
+    collector_number: str
 
-    if info.collector_number is not None:
+    def to_json_obj(self) -> dict[str, str | int]:
         return {
-            "collector_number": info.collector_number,
-            "set": info.set_code,
+            "collector_number": self.collector_number,
+            "set": self.set_code,
         }
 
-    return {"name": info.name, "set": info.set_code}
+
+@dataclass
+class MultiverseId(CardIdentifier):
+    multiverse_id: int
+
+    def to_json_obj(self) -> dict[str, str | int]:
+        return {"multiverse_id": self.multiverse_id}
 
 
-def fetch_scryfall_data(card_info: Sequence[CardInfo]) -> Sequence[ScryfallCard]:
+def fetch_scryfall(card_info: Sequence[CardIdentifier]) -> Sequence[ScryfallCard]:
     SCRYFALL_URL = "https://api.scryfall.com/cards/collection"
     CHUNK_SIZE = 75
 
@@ -52,7 +66,7 @@ def fetch_scryfall_data(card_info: Sequence[CardInfo]) -> Sequence[ScryfallCard]
     )
 
     for chunk in chunks:
-        card_ids_payload = {"identifiers": [get_identifier(ci) for ci in chunk]}
+        card_ids_payload = {"identifiers": [ci.to_json_obj() for ci in chunk]}
         data = json.dumps(card_ids_payload).encode("utf-8")
 
         request = Request(SCRYFALL_URL, data, headers)
